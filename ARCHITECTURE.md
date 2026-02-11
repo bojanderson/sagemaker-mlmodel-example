@@ -1,192 +1,670 @@
-# SageMaker ML Pipeline - Implementation Summary
+# Architecture Documentation
 
 ## Overview
-This repository provides a complete end-to-end machine learning pipeline using AWS SageMaker with three different algorithms: XGBoost, K-Nearest Neighbors (KNN), and scikit-learn Gradient Boosting Machine (GBM).
 
-## Key Features
+This project implements an end-to-end machine learning pipeline on AWS SageMaker that trains multiple models, compares their performance, and deploys the best model for batch inference. The architecture follows a modular design with clear separation of concerns across five main components.
 
-### 1. Data Pipeline
-- **Synthetic Data Generation**: Creates California housing-style dataset for offline development
-- **Data Preprocessing**: Formats data for SageMaker (target column first, no headers)
-- **Train/Test Split**: Proper 80/20 split with reproducibility
+## System Architecture
 
-### 2. Model Training
-- **XGBoost**: Using SageMaker built-in container (v1.5-1)
-  - Configurable hyperparameters: max_depth, eta, subsample, colsample_bytree, num_round
-  - Objective: reg:squarederror
-  
-- **KNN**: Using SageMaker built-in container
-  - Configurable hyperparameters: k, sample_size
-  - Predictor type: regressor
-  
-- **scikit-learn GBM**: Using SageMaker scikit-learn container (v1.2-1)
-  - Custom training script: `scripts/sklearn_gbm_script.py`
-  - Configurable hyperparameters: n_estimators, max_depth, learning_rate
-
-### 3. Hyperparameter Tuning
-- Automatic hyperparameter optimization for all models
-- Configurable search ranges
-- Parallel job execution support
-- Metric-based optimization (minimize RMSE/MSE)
-
-### 4. Model Comparison & Selection
-- Automatic comparison based on validation metrics
-- Supports multiple metric types: RMSE, MSE, MAE, R²
-- Selects best performing model
-- Outputs comparison results to JSON
-
-### 5. Batch Deployment
-- SageMaker Batch Transform for batch inference
-- Configurable instance types
-- S3 input/output handling
-- Job monitoring and status tracking
-
-### 6. Infrastructure as Code (CDK)
-- Complete AWS CDK stack in TypeScript/Python
-- Resources created:
-  - S3 bucket for data and models (versioned, encrypted)
-  - IAM roles for SageMaker execution
-  - CloudWatch log groups
-  - Optional: SageMaker Notebook instance
-
-### 7. Testing
-- **Unit Tests**: 12 tests covering individual components
-- **Integration Tests**: 3 tests for end-to-end pipeline
-- **Mock Mode**: Can run without AWS credentials
-- **Coverage**: Test coverage tracking included
-
-## Project Structure
+### High-Level Architecture
 
 ```
-sagemaker-mlmodel-example/
-├── src/
-│   ├── pipeline/
-│   │   ├── data_preparation.py       # Data generation & preprocessing
-│   │   ├── training.py                # Model training configurations
-│   │   ├── model_comparison.py        # Model comparison logic
-│   │   └── batch_deployment.py        # Batch inference deployment
-│   ├── cdk/
-│   │   ├── app.py                     # CDK app entry point
-│   │   ├── sagemaker_stack.py         # Infrastructure stack
-│   │   └── cdk.json                   # CDK configuration
-│   └── run_pipeline.py                # Main orchestration script
-├── scripts/
-│   └── sklearn_gbm_script.py          # scikit-learn training script
-├── tests/
-│   ├── unit/                          # Unit tests
-│   │   ├── test_data_preparation.py
-│   │   ├── test_training.py
-│   │   └── test_model_comparison.py
-│   └── integration/
-│       └── test_pipeline.py           # End-to-end tests
-├── .github/
-│   └── workflows/
-│       └── tests.yml                  # CI/CD configuration
-├── requirements.txt                   # Python dependencies
-├── requirements-cdk.txt               # CDK dependencies
-├── setup.py                           # Package setup
-├── pytest.ini                         # Pytest configuration
-├── examples.py                        # Usage examples
-├── example_notebook.ipynb             # Jupyter notebook demo
-├── CONTRIBUTING.md                    # Contribution guidelines
-└── README.md                          # Main documentation
+┌───────────────────────────────────────────────────────────────────┐
+│                         User / Developer                           │
+└───────────────────┬───────────────────────────────────────────────┘
+                    │
+                    ▼
+┌───────────────────────────────────────────────────────────────────┐
+│                      run_pipeline.py (Orchestrator)                │
+│  - Argument parsing                                                │
+│  - Step coordination                                               │
+│  - Error handling                                                  │
+└───────────┬───────────────────────────────────────────────────────┘
+            │
+            ▼
+┌───────────────────────────────────────────────────────────────────┐
+│                        Pipeline Modules                            │
+├───────────────────────────────────────────────────────────────────┤
+│  ┌─────────────────┐  ┌──────────────┐  ┌─────────────────────┐  │
+│  │ Data            │  │ Training     │  │ Model Comparison    │  │
+│  │ Preparation     │→ │ Module       │→ │ Module              │  │
+│  └─────────────────┘  └──────────────┘  └─────────────────────┘  │
+│           │                   │                      │             │
+│           ▼                   ▼                      ▼             │
+│  ┌─────────────────────────────────────────────────────────────┐  │
+│  │               Batch Deployment Module                       │  │
+│  └─────────────────────────────────────────────────────────────┘  │
+└───────────┬───────────────────────────────────────────────────────┘
+            │
+            ▼
+┌───────────────────────────────────────────────────────────────────┐
+│                         AWS SageMaker                              │
+├───────────────────────────────────────────────────────────────────┤
+│  ┌─────────────┐  ┌─────────────┐  ┌──────────────────────────┐  │
+│  │ Training    │  │ Tuning      │  │ Batch Transform          │  │
+│  │ Jobs        │  │ Jobs        │  │ Jobs                     │  │
+│  └─────────────┘  └─────────────┘  └──────────────────────────┘  │
+└───────────┬───────────────────────────────────────────────────────┘
+            │
+            ▼
+┌───────────────────────────────────────────────────────────────────┐
+│                         AWS Services                               │
+├───────────────────────────────────────────────────────────────────┤
+│  ┌─────────┐    ┌──────────┐    ┌─────────────┐                  │
+│  │ S3      │    │ IAM      │    │ CloudWatch  │                  │
+│  │ Storage │    │ Roles    │    │ Logs        │                  │
+│  └─────────┘    └──────────┘    └─────────────┘                  │
+└───────────────────────────────────────────────────────────────────┘
 ```
 
-## Usage Modes
+## Component Architecture
 
-### 1. Local/Mock Mode (No AWS Credentials Required)
-```bash
-python src/run_pipeline.py --bucket test-bucket
+### 1. Pipeline Orchestrator (`run_pipeline.py`)
+
+**Purpose**: Main entry point that coordinates all pipeline steps.
+
+**Responsibilities**:
+- Parse command-line arguments
+- Initialize AWS session and SageMaker client
+- Execute pipeline steps in sequence
+- Handle errors and provide user feedback
+- Support both mock and real execution modes
+
+**Key Features**:
+- **Mock Mode**: Runs without AWS credentials for testing
+- **Flexible Configuration**: Command-line arguments for all major settings
+- **Error Handling**: Comprehensive exception handling with user-friendly messages
+- **Progress Tracking**: Clear step-by-step execution feedback
+
+### 2. Data Preparation Module (`data_preparation.py`)
+
+**Purpose**: Load, preprocess, and prepare training/test datasets.
+
+**Data Flow**:
 ```
-- Uses synthetic data
-- Mock training results
-- No actual AWS resources used
-- Perfect for development and testing
-
-### 2. Development Mode (With AWS Credentials)
-```bash
-python src/run_pipeline.py --bucket my-bucket --no-mock
+California Housing Dataset
+    │
+    ├─► Load from sklearn
+    │
+    ├─► Split (80% train / 20% test)
+    │
+    ├─► Format for SageMaker
+    │   - Target column first
+    │   - No headers
+    │   - CSV format
+    │
+    └─► Save to local files
+         │
+         └─► Upload to S3
 ```
-- Uploads data to S3
-- Configures actual SageMaker training jobs
-- Requires AWS credentials and permissions
 
-### 3. Full Production Mode
-```bash
-python src/run_pipeline.py --bucket my-bucket --no-mock --tune --deploy
+**Key Functions**:
+- `generate_and_prepare_data()`: Main entry point
+  - Loads California housing dataset
+  - Splits into train/test sets
+  - Returns feature matrix and target arrays
+
+- `save_data_for_sagemaker()`: Format and save data
+  - Formats data for SageMaker (target first, no headers)
+  - Saves to CSV files
+  - Returns file paths
+
+**Data Format**:
 ```
-- Full hyperparameter tuning
-- Actual model training
-- Best model deployment for batch inference
+target,feature1,feature2,...,feature8
+2.5,8.32,41.0,6.98,1.02,322.0,2.56,37.88,-122.23
+...
+```
 
-## Testing Results
+### 3. Training Module (`training.py`)
 
-All tests pass successfully:
-- ✅ 15 tests passed
-- ⏭️ 6 tests skipped (require full SageMaker SDK)
-- ⚠️ 3 warnings (network access for dataset download)
+**Purpose**: Configure and launch SageMaker training jobs for multiple models.
 
-## Key Design Decisions
+**Supported Models**:
 
-1. **Graceful Degradation**: Code works even without AWS credentials (mock mode)
-2. **Version Compatibility**: Handles different SageMaker SDK versions
-3. **Synthetic Data**: No external data dependencies for testing
-4. **Minimal Dependencies**: Core functionality requires only common packages
-5. **Comprehensive Testing**: Both unit and integration tests included
-6. **Well-Documented**: Extensive README, examples, and code comments
+| Model | Algorithm | Container | Hyperparameters |
+|-------|-----------|-----------|----------------|
+| XGBoost | Gradient Boosting | SageMaker Built-in | max_depth, eta, subsample, colsample_bytree, num_round |
+| KNN | K-Nearest Neighbors | SageMaker Built-in | k, sample_size |
+| scikit-learn GBM | Gradient Boosting | SageMaker sklearn | n_estimators, max_depth, learning_rate |
 
-## Performance
+**Training Flow**:
+```
+┌────────────────────┐
+│ Initialize Models  │
+│ - Get containers   │
+│ - Set hyperparams  │
+└──────────┬─────────┘
+           │
+           ▼
+┌────────────────────┐
+│ For each model:    │
+│                    │
+│ ┌───────────────┐  │
+│ │ Create        │  │
+│ │ Estimator     │  │
+│ └───────┬───────┘  │
+│         │          │
+│         ▼          │
+│ ┌───────────────┐  │
+│ │ Fit with      │  │
+│ │ train data    │  │
+│ └───────┬───────┘  │
+│         │          │
+│         ▼          │
+│ ┌───────────────┐  │
+│ │ Wait for      │  │
+│ │ completion    │  │
+│ └───────────────┘  │
+└────────────────────┘
+```
 
-Mock pipeline execution: ~10 seconds
-- Data generation: ~2 seconds
-- Model comparison: <1 second
-- Result output: <1 second
+**Key Functions**:
+- `setup_training_jobs()`: Initialize all model estimators
+- `train_models()`: Execute training (mock or real)
+- `tune_hyperparameters()`: Run hyperparameter optimization
 
-Real SageMaker execution time varies:
-- Training (each model): 5-15 minutes
-- Hyperparameter tuning: 30-60 minutes
-- Batch transform: 5-10 minutes
+**Training Modes**:
+1. **Mock Mode**: Returns simulated training results instantly
+2. **Real Mode**: Launches actual SageMaker training jobs
+3. **Tuning Mode**: Runs hyperparameter tuning jobs with multiple trials
 
-## Cost Estimates
+### 4. Model Comparison Module (`model_comparison.py`)
 
-AWS costs for one complete run (approximate):
-- **Data Storage (S3)**: $0.01 (negligible for small datasets)
-- **Training Jobs**: $1-3 (3 models × 5-15 min on ml.m5.xlarge)
-- **Hyperparameter Tuning**: $10-30 (10 jobs per model)
-- **Batch Transform**: $0.50-1.00 (5-10 min on ml.m5.xlarge)
-- **CloudWatch Logs**: $0.05 (negligible)
+**Purpose**: Compare trained models and select the best performer.
 
-**Total per run**: $1.50-$35 depending on configuration
+**Comparison Flow**:
+```
+┌──────────────────────┐
+│ Retrieve Metrics     │
+│ from Training Jobs   │
+└──────────┬───────────┘
+           │
+           ▼
+┌──────────────────────┐
+│ Extract Metrics:     │
+│ - RMSE               │
+│ - MSE                │
+│ - MAE                │
+└──────────┬───────────┘
+           │
+           ▼
+┌──────────────────────┐
+│ Rank Models by:      │
+│ 1. RMSE (primary)    │
+│ 2. MSE (secondary)   │
+│ 3. MAE (tertiary)    │
+└──────────┬───────────┘
+           │
+           ▼
+┌──────────────────────┐
+│ Select Best Model    │
+│ Save Comparison JSON │
+└──────────────────────┘
+```
 
-## Security Features
+**Metric Priority**:
+1. **RMSE** (Root Mean Squared Error) - Primary metric
+2. **MSE** (Mean Squared Error) - Secondary metric
+3. **MAE** (Mean Absolute Error) - Tertiary metric
 
-1. **S3 Encryption**: Server-side encryption enabled
-2. **Block Public Access**: All S3 buckets have public access blocked
-3. **IAM Least Privilege**: Roles have minimal required permissions
-4. **Versioning**: S3 bucket versioning enabled
-5. **No Hardcoded Credentials**: Uses AWS IAM roles
+**Key Functions**:
+- `compare_models()`: Main comparison logic
+  - Retrieves metrics from SageMaker
+  - Ranks models by performance
+  - Returns best model information
+
+- `save_comparison_results()`: Save results to JSON
+  - Model rankings
+  - Metrics for each model
+  - Best model selection reasoning
+
+**Output Format** (`model_comparison.json`):
+```json
+{
+  "models": [
+    {
+      "name": "sklearn-gbm",
+      "job_name": "sklearn-gbm-2024-01-15-12-30-45",
+      "metrics": {
+        "rmse": 0.5000,
+        "mse": 0.2500,
+        "mae": 0.4000
+      },
+      "rank": 1
+    },
+    ...
+  ],
+  "best_model": "sklearn-gbm",
+  "selection_criteria": "Lowest RMSE"
+}
+```
+
+### 5. Batch Deployment Module (`batch_deployment.py`)
+
+**Purpose**: Deploy the best model for batch inference using SageMaker Batch Transform.
+
+**Deployment Flow**:
+```
+┌────────────────────┐
+│ Create Model       │
+│ - Best job name    │
+│ - Container image  │
+│ - IAM role         │
+└──────────┬─────────┘
+           │
+           ▼
+┌────────────────────┐
+│ Create Transformer │
+│ - Instance type    │
+│ - Instance count   │
+│ - Strategy         │
+└──────────┬─────────┘
+           │
+           ▼
+┌────────────────────┐
+│ Run Transform Job  │
+│ - Input: S3 test   │
+│ - Output: S3 pred  │
+└──────────┬─────────┘
+           │
+           ▼
+┌────────────────────┐
+│ Wait & Monitor     │
+│ - Job status       │
+│ - CloudWatch logs  │
+└────────────────────┘
+```
+
+**Key Functions**:
+- `deploy_batch_transform()`: Main deployment function
+  - Creates SageMaker model
+  - Sets up Batch Transform job
+  - Monitors completion
+  - Returns prediction S3 path
+
+**Configuration**:
+- **Instance Type**: ml.m5.xlarge (configurable)
+- **Instance Count**: 1 (can scale horizontally)
+- **Strategy**: MultiRecord (batch multiple records per request)
+
+## Data Flow
+
+### Complete Pipeline Data Flow
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     1. Data Preparation                          │
+├─────────────────────────────────────────────────────────────────┤
+│  sklearn dataset → train/test split → format → save locally     │
+│                                                   │              │
+│                                                   ▼              │
+│                              ┌─────────────────────────────┐    │
+│                              │  train_processed.csv        │    │
+│                              │  test_processed.csv         │    │
+│                              └─────────────┬───────────────┘    │
+└────────────────────────────────────────────┼────────────────────┘
+                                             │
+┌────────────────────────────────────────────┼────────────────────┐
+│                     2. S3 Upload            ▼                    │
+├─────────────────────────────────────────────────────────────────┤
+│                    s3://bucket/prefix/data/                      │
+│                    ├── train/train_processed.csv                │
+│                    └── validation/test_processed.csv            │
+└────────────────────────────────┬────────────────────────────────┘
+                                 │
+┌────────────────────────────────┼────────────────────────────────┐
+│                     3. Training ▼                                │
+├─────────────────────────────────────────────────────────────────┤
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
+│  │ XGBoost      │  │ KNN          │  │ scikit-learn GBM     │  │
+│  │ Training Job │  │ Training Job │  │ Training Job         │  │
+│  └──────┬───────┘  └──────┬───────┘  └──────┬───────────────┘  │
+│         │                 │                  │                  │
+│         ▼                 ▼                  ▼                  │
+│  s3://.../model.tar.gz (for each model)                         │
+└────────────────────────────────┬────────────────────────────────┘
+                                 │
+┌────────────────────────────────┼────────────────────────────────┐
+│                4. Model Compare ▼                                │
+├─────────────────────────────────────────────────────────────────┤
+│  Retrieve metrics → Compare → Select best → Save JSON           │
+│                                              │                   │
+│                                              ▼                   │
+│                                   model_comparison.json          │
+└────────────────────────────────┬────────────────────────────────┘
+                                 │
+┌────────────────────────────────┼────────────────────────────────┐
+│                  5. Deployment  ▼                                │
+├─────────────────────────────────────────────────────────────────┤
+│  Create model → Batch Transform → Predictions to S3             │
+│                                              │                   │
+│                                              ▼                   │
+│                    s3://bucket/prefix/predictions/               │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## AWS Resource Architecture
+
+### Infrastructure Components (CDK Stack)
+
+The project uses AWS CDK to provision all required infrastructure:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      CDK Stack (Python)                          │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌────────────────────┐                                         │
+│  │  S3 Bucket         │                                         │
+│  │  - Data storage    │                                         │
+│  │  - Model storage   │                                         │
+│  │  - Predictions     │                                         │
+│  └────────────────────┘                                         │
+│                                                                  │
+│  ┌────────────────────┐       ┌────────────────────┐           │
+│  │  IAM Roles         │       │  CloudWatch        │           │
+│  │  - SageMaker       │       │  - Log groups      │           │
+│  │  - Notebook        │       │  - Metrics         │           │
+│  └────────────────────┘       └────────────────────┘           │
+│                                                                  │
+│  ┌────────────────────┐                                         │
+│  │  SageMaker         │                                         │
+│  │  - Notebook (opt)  │                                         │
+│  └────────────────────┘                                         │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### S3 Structure
+
+```
+s3://my-sagemaker-bucket/
+├── sagemaker-housing/              # Default prefix
+│   ├── data/
+│   │   ├── train/
+│   │   │   └── train_processed.csv
+│   │   └── validation/
+│   │       └── test_processed.csv
+│   ├── models/
+│   │   ├── xgboost-2024-01-15-10-30-45/
+│   │   │   └── model.tar.gz
+│   │   ├── knn-2024-01-15-10-35-20/
+│   │   │   └── model.tar.gz
+│   │   └── sklearn-gbm-2024-01-15-10-40-10/
+│   │       ├── model.tar.gz
+│   │       └── code/
+│   │           └── sklearn_gbm_script.py
+│   └── predictions/
+│       └── test_processed.csv.out
+└── model_comparison.json
+```
+
+## Design Decisions
+
+### 1. Mock Mode for Testing
+
+**Decision**: Support running the entire pipeline without AWS credentials.
+
+**Rationale**:
+- Enables local development and testing
+- Reduces costs during development
+- Allows CI/CD integration without AWS setup
+- Faster feedback loop for code changes
+
+**Implementation**: Each module checks for `mock=True` flag and returns simulated data.
+
+### 2. Modular Architecture
+
+**Decision**: Separate concerns into five distinct modules.
+
+**Rationale**:
+- **Maintainability**: Each module has a single responsibility
+- **Testability**: Modules can be tested independently
+- **Reusability**: Components can be reused in other pipelines
+- **Clarity**: Clear separation makes the codebase easier to understand
+
+### 3. SageMaker Built-in Algorithms
+
+**Decision**: Use SageMaker's built-in containers rather than custom containers.
+
+**Rationale**:
+- **Optimized Performance**: AWS-optimized implementations
+- **Managed Updates**: AWS handles security patches and updates
+- **Reduced Complexity**: No need to manage Docker images
+- **Cost Effective**: Pre-built containers are included in SageMaker pricing
+
+### 4. Metric-Based Model Selection
+
+**Decision**: Automatically select best model using RMSE as primary metric.
+
+**Rationale**:
+- **Objectivity**: Removes human bias from model selection
+- **Reproducibility**: Same metrics always yield same choice
+- **Transparency**: Clear criteria for model selection
+- **Extensibility**: Easy to add more metrics or change priority
+
+### 5. Batch Transform for Deployment
+
+**Decision**: Use Batch Transform instead of real-time endpoints.
+
+**Rationale**:
+- **Cost Efficiency**: No always-on infrastructure
+- **Scalability**: Handles large datasets efficiently
+- **Simplicity**: Easier to manage than endpoints
+- **Use Case Fit**: California housing predictions don't require real-time inference
+
+## Extension Points
+
+### Adding New Models
+
+To add a new model to the pipeline:
+
+1. **Update `training.py`**:
+   ```python
+   def setup_training_jobs(sagemaker_session, role, models, ...):
+       # Add new model configuration
+       if 'new-model' in models:
+           estimators['new-model'] = NewModelEstimator(...)
+   ```
+
+2. **Add hyperparameters** in the model configuration dictionary
+
+3. **Update mock data** in `train_models()` if using mock mode
+
+### Custom Metrics
+
+To add new evaluation metrics:
+
+1. **Update `model_comparison.py`**:
+   ```python
+   def compare_models(job_names, sagemaker_client, mock=False):
+       # Add metric extraction
+       metrics['new_metric'] = extract_new_metric(job)
+   ```
+
+2. **Update ranking logic** to include new metric
+
+### Alternative Datasets
+
+To use a different dataset:
+
+1. **Update `data_preparation.py`**:
+   ```python
+   def generate_and_prepare_data():
+       # Load your custom dataset
+       X, y = load_custom_dataset()
+       return X_train, X_test, y_train, y_test
+   ```
+
+2. **Ensure data format** matches SageMaker requirements (target first, no headers)
+
+## Performance Considerations
+
+### Training Performance
+
+- **Instance Types**: Current default is `ml.m5.xlarge`
+  - For larger datasets, consider `ml.m5.2xlarge` or GPU instances
+  - For production workloads, use `ml.c5.xlarge` for cost optimization
+
+- **Parallel Training**: Models train independently and can run in parallel
+  - Current implementation: Sequential execution
+  - Enhancement: Use threading or async to parallelize
+
+### Batch Transform Performance
+
+- **Instance Count**: Scale horizontally for large datasets
+  ```python
+  transformer = model.transformer(
+      instance_count=4,  # Process data in parallel across 4 instances
+      ...
+  )
+  ```
+
+- **Batch Size**: Tune `max_payload` for optimal throughput
+  - Larger payloads = fewer requests = better performance
+  - Must fit in instance memory
+
+### Cost Optimization
+
+1. **Use Spot Instances** for training (70% cost reduction)
+   ```python
+   estimator = sagemaker.estimator.Estimator(
+       ...
+       use_spot_instances=True,
+       max_wait=3600,
+   )
+   ```
+
+2. **Right-size instances** based on dataset
+   - Small datasets (<1GB): ml.m5.large
+   - Medium datasets (1-10GB): ml.m5.xlarge
+   - Large datasets (>10GB): ml.m5.2xlarge+
+
+3. **Clean up resources** after pipeline completes
+   - Delete unused models
+   - Archive old training data to Glacier
+
+## Security
+
+### IAM Permissions
+
+Minimum required permissions:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "sagemaker:CreateTrainingJob",
+        "sagemaker:CreateModel",
+        "sagemaker:CreateTransformJob",
+        "sagemaker:DescribeTrainingJob",
+        "sagemaker:DescribeModel",
+        "sagemaker:DescribeTransformJob"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::my-bucket",
+        "arn:aws:s3:::my-bucket/*"
+      ]
+    }
+  ]
+}
+```
+
+### Data Security
+
+- **Encryption**: All S3 data is encrypted at rest (SSE-S3)
+- **VPC**: Consider deploying SageMaker in VPC for network isolation
+- **Access Logging**: Enable S3 access logs for audit trails
+
+## Monitoring
+
+### CloudWatch Metrics
+
+Key metrics to monitor:
+
+- **Training Jobs**:
+  - `TrainingTime`: Duration of training
+  - `TrainingDataSize`: Input data size
+  - Algorithm-specific metrics (loss, accuracy, etc.)
+
+- **Batch Transform**:
+  - `ModelLatency`: Time per prediction
+  - `Invocations`: Number of predictions made
+
+### Logging
+
+- **Application Logs**: Python logging to stdout (captured by CloudWatch)
+- **SageMaker Logs**: Automatic logging to CloudWatch Logs
+- **Custom Metrics**: Use CloudWatch custom metrics for business KPIs
+
+## Testing Strategy
+
+### Unit Tests
+
+Test individual modules in isolation:
+- Data preparation logic
+- Model configuration
+- Metric extraction
+- Comparison logic
+
+### Integration Tests
+
+Test the complete pipeline:
+- End-to-end mock execution
+- S3 upload/download
+- SageMaker API interactions (mocked)
+
+### CI/CD Integration
+
+```yaml
+# Example GitHub Actions workflow
+- name: Run tests
+  run: |
+    pip install -r requirements.txt
+    pytest tests/ -v --cov=src
+
+- name: Test pipeline in mock mode
+  run: |
+    python src/run_pipeline.py --bucket test-bucket --mock
+```
 
 ## Future Enhancements
 
-Potential improvements:
-1. Add more algorithms (Random Forest, Neural Networks)
-2. Add real-time endpoint deployment option
-3. Add model monitoring and drift detection
-4. Add data quality checks
-5. Add experiment tracking (e.g., MLflow)
-6. Add model registry integration
-7. Add automated model retraining pipeline
-8. Add A/B testing capabilities
+### Planned Improvements
 
-## Maintenance
+1. **Real-time Endpoints**: Add support for real-time inference
+2. **MLOps Integration**: Add MLflow or SageMaker Experiments tracking
+3. **Model Registry**: Integrate with SageMaker Model Registry
+4. **A/B Testing**: Support deploying multiple model versions
+5. **AutoML Integration**: Add SageMaker Autopilot support
+6. **Feature Store**: Integrate with SageMaker Feature Store
+7. **Pipeline Automation**: Convert to SageMaker Pipelines
 
-The code is designed to be maintainable:
-- Clear separation of concerns
-- Comprehensive tests
-- Type hints where appropriate
-- Detailed documentation
-- CI/CD ready with GitHub Actions
+### Community Contributions
 
-## License
+We welcome contributions in these areas:
+- Additional model types (Linear Learner, Neural Networks)
+- Real-time deployment options
+- Advanced hyperparameter tuning strategies
+- Cost optimization techniques
+- Performance benchmarking
 
-See [LICENSE](LICENSE) file for details.
+## References
+
+- [AWS SageMaker Developer Guide](https://docs.aws.amazon.com/sagemaker/latest/dg/)
+- [SageMaker Python SDK](https://sagemaker.readthedocs.io/)
+- [AWS CDK Python Reference](https://docs.aws.amazon.com/cdk/api/v2/python/)
+- [SageMaker Built-in Algorithms](https://docs.aws.amazon.com/sagemaker/latest/dg/algos.html)
