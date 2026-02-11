@@ -1,16 +1,102 @@
 # SageMaker ML Model Example
 
-A complete example of using AWS SageMaker for a machine learning pipeline including:
-- Data preprocessing
-- Training and hyperparameter tuning with multiple models
-- Model comparison and selection
-- Batch inference deployment
-- Infrastructure as Code (CDK)
-- Comprehensive tests
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)](tests/)
 
-## Features
+A production-ready example of building an end-to-end machine learning pipeline with AWS SageMaker. This project demonstrates best practices for training, comparing, and deploying multiple ML models using SageMaker's built-in algorithms and infrastructure as code.
 
-This repository demonstrates a complete ML pipeline using three SageMaker prebuilt containers:
+## 🎯 What This Project Does
+
+- **Multi-Model Training**: Train and compare XGBoost, KNN, and scikit-learn models
+- **Automated Hyperparameter Tuning**: Find optimal parameters using SageMaker's tuning jobs
+- **Model Comparison**: Automatically select the best model based on performance metrics
+- **Batch Inference**: Deploy models for scalable batch predictions
+- **Infrastructure as Code**: Provision all AWS resources using AWS CDK
+- **Local Development**: Run and test the entire pipeline locally without AWS costs
+
+## 🚀 Quick Start
+
+### Running Locally (No AWS Required)
+
+```bash
+# Clone and install
+git clone https://github.com/bojanderson/sagemaker-mlmodel-example.git
+cd sagemaker-mlmodel-example
+pip install -r requirements.txt
+
+# Run the complete pipeline in mock mode
+python src/run_pipeline.py --bucket demo-bucket --mock
+```
+
+This runs the entire pipeline locally with mock training results. Perfect for:
+- Understanding the pipeline flow
+- Testing changes without AWS costs
+- CI/CD integration
+- Development and debugging
+
+### Running on AWS SageMaker
+
+```bash
+# Set up AWS credentials
+export AWS_DEFAULT_REGION=us-east-1
+
+# Run training on SageMaker
+python src/run_pipeline.py --bucket my-sagemaker-bucket --no-mock
+
+# With hyperparameter tuning
+python src/run_pipeline.py --bucket my-sagemaker-bucket --no-mock --tune
+
+# Full pipeline with deployment
+python src/run_pipeline.py --bucket my-sagemaker-bucket --no-mock --deploy
+```
+
+**💡 Tip**: Deploy infrastructure with CDK first (see [Deploying Infrastructure](#deploying-infrastructure-with-cdk))
+
+## 📋 Table of Contents
+
+- [Architecture Overview](#architecture-overview)
+- [Features](#features)
+- [Project Structure](#project-structure)
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Pipeline Components](#pipeline-components)
+- [Configuration](#configuration)
+- [Testing](#testing)
+- [Cost Considerations](#cost-considerations)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
+
+## 🏗️ Architecture Overview
+
+The pipeline follows a linear workflow with five main stages:
+
+```
+┌─────────────────┐     ┌──────────────┐     ┌─────────────────┐
+│ Data            │────▶│ S3 Upload    │────▶│ Model Training  │
+│ Preparation     │     │              │     │ (XGB/KNN/GBM)   │
+└─────────────────┘     └──────────────┘     └─────────────────┘
+                                                      │
+                                                      ▼
+┌─────────────────┐     ┌──────────────────────────────────────┐
+│ Batch Transform │◀────│ Model Comparison & Selection         │
+│ Deployment      │     │ (Select best based on RMSE/MSE/MAE) │
+└─────────────────┘     └──────────────────────────────────────┘
+```
+
+**Key Components**:
+- **Data Layer**: California housing dataset → preprocessing → S3 storage
+- **Training Layer**: Parallel training of 3 models using SageMaker containers
+- **Comparison Layer**: Metric-based model selection (RMSE, MSE, MAE)
+- **Deployment Layer**: Batch Transform for scalable inference
+
+For detailed architecture documentation, see [ARCHITECTURE.md](ARCHITECTURE.md).
+
+## ✨ Features
+
+This repository demonstrates a production-grade ML pipeline with:
 - **XGBoost** - Gradient boosting algorithm
 - **KNN** - K-Nearest Neighbors
 - **scikit-learn GBM** - Gradient Boosting Machine
@@ -286,6 +372,16 @@ The repository includes comprehensive tests:
 - **Integration Tests**: Test the complete pipeline end-to-end
 
 All tests can run without AWS credentials by using mock data.
+
+## Troubleshooting
+
+For common issues and solutions, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
+
+**Quick fixes**:
+- **Import errors**: Make sure all dependencies are installed: `pip install -r requirements.txt`
+- **AWS credentials**: Configure with `aws configure` or use `--mock` mode
+- **SageMaker permissions**: Ensure your IAM role has SageMaker execution permissions
+- **Tests failing**: Run `pytest tests/ -v` to see detailed error messages
 
 ## Contributing
 
