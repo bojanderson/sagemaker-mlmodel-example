@@ -1,6 +1,5 @@
 """Unit tests for data preparation module."""
 
-import pytest
 import os
 import pandas as pd
 import tempfile
@@ -58,9 +57,7 @@ class TestDataPreparation:
         output_file = os.path.join(self.temp_dir, "train_processed.csv")
 
         # Preprocess
-        df = preprocess_for_sagemaker(
-            input_file, output_file, target_column="MedHouseVal"
-        )
+        preprocess_for_sagemaker(input_file, output_file, target_column="MedHouseVal")
 
         # Check that output file was created
         assert os.path.exists(output_file)

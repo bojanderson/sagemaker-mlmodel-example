@@ -7,7 +7,6 @@ import time
 
 try:
     import sagemaker
-    from sagemaker.transformer import Transformer
     from sagemaker.model import Model
 
     SAGEMAKER_AVAILABLE = True
@@ -102,7 +101,7 @@ class BatchDeployer:
         print(f"  Output: {output_path}")
 
         try:
-            response = self.sagemaker_client.create_transform_job(
+            self.sagemaker_client.create_transform_job(
                 TransformJobName=transform_job_name,
                 ModelName=model_name,
                 TransformInput={
@@ -150,7 +149,7 @@ class BatchDeployer:
 
             if status in ["Completed", "Failed", "Stopped"]:
                 if status == "Completed":
-                    print(f"✓ Transform job completed successfully!")
+                    print("✓ Transform job completed successfully!")
                     print(
                         f"  Output location: {response['TransformOutput']['S3OutputPath']}"
                     )

@@ -86,7 +86,7 @@ def generate_sample_data(output_dir="data", use_synthetic=False):
     print(f"Train data shape: {train_df.shape}")
     print(f"Test data shape: {test_df.shape}")
     print(f"Features: {feature_names}")
-    print(f"Target: MedHouseVal")
+    print("Target: MedHouseVal")
 
     return train_df, test_df, feature_names, "MedHouseVal"
 

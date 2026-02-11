@@ -4,7 +4,6 @@ Supports XGBoost, KNN, and scikit-learn GBM.
 """
 
 import json
-import boto3
 
 try:
     import sagemaker
@@ -22,8 +21,6 @@ except (ImportError, ModuleNotFoundError):
     SAGEMAKER_AVAILABLE = False
     sagemaker = None
     print("Warning: SageMaker SDK not fully available. Some features may not work.")
-
-import time
 
 
 class ModelTrainer:

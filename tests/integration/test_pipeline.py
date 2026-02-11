@@ -1,15 +1,14 @@
 """Integration tests for the complete pipeline."""
 
-import pytest
 import os
 import tempfile
 import shutil
 import sys
 
-# Add src to path
+# Add src to path (must be done before run_pipeline import)
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 
-from run_pipeline import run_pipeline
+from run_pipeline import run_pipeline  # noqa: E402
 
 
 class TestPipelineIntegration:
