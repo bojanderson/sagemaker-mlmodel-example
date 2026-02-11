@@ -7,7 +7,6 @@ from aws_cdk import (
     Stack,
     aws_s3 as s3,
     aws_iam as iam,
-    aws_sagemaker as sagemaker,
     RemovalPolicy,
     CfnOutput,
 )

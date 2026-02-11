@@ -6,7 +6,6 @@ Compares performance of different models and selects the best one.
 import json
 import boto3
 from typing import Dict, List, Tuple
-import pandas as pd
 
 
 class ModelComparator:
@@ -71,12 +70,9 @@ class ModelComparator:
             list: List of training job results sorted by performance
         """
         try:
-            response = self.sagemaker_client.describe_hyper_parameter_tuning_job(
+            self.sagemaker_client.describe_hyper_parameter_tuning_job(
                 HyperParameterTuningJobName=tuning_job_name
             )
-
-            # Get best training job
-            best_job = response.get("BestTrainingJob", {})
 
             # List all training jobs
             jobs_response = (

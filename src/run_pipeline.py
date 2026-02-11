@@ -6,16 +6,25 @@ Runs the complete ML pipeline: data prep, training, comparison, and deployment.
 import argparse
 import os
 import sys
-import boto3
-import sagemaker
 
-# Add src to path
+# Add src to path (must be done before pipeline imports)
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from pipeline.data_preparation import generate_sample_data, preprocess_for_sagemaker
-from pipeline.training import ModelTrainer, save_training_config
-from pipeline.model_comparison import ModelComparator, create_mock_model_results
-from pipeline.batch_deployment import BatchDeployer, get_image_uri_for_model
+import boto3  # noqa: E402
+import sagemaker  # noqa: E402
+from pipeline.data_preparation import (  # noqa: E402
+    generate_sample_data,
+    preprocess_for_sagemaker,
+)
+from pipeline.training import ModelTrainer  # noqa: E402
+from pipeline.model_comparison import (  # noqa: E402
+    ModelComparator,
+    create_mock_model_results,
+)
+from pipeline.batch_deployment import (  # noqa: E402
+    BatchDeployer,
+    get_image_uri_for_model,
+)
 
 
 def get_execution_role_safe():
@@ -113,7 +122,7 @@ def run_pipeline(
     else:
         try:
             trainer = ModelTrainer(bucket=bucket, prefix=prefix, region=region)
-            training_configs = trainer.run_training_jobs(models=models, tune=tune)
+            trainer.run_training_jobs(models=models, tune=tune)
 
             # In a real scenario, you would wait for jobs and collect results
             # For now, we'll use mock results
@@ -174,7 +183,7 @@ def run_pipeline(
     print("Pipeline execution complete!")
     print("=" * 60)
     print(f"\nBest model: {best_model_name}")
-    print(f"Results saved to: model_comparison.json")
+    print("Results saved to: model_comparison.json")
 
     return best_model_name, model_results
 
