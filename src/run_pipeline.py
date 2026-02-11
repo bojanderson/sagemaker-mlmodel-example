@@ -17,6 +17,7 @@ import boto3  # noqa: E402
 
 try:
     import sagemaker  # noqa: E402
+
     SAGEMAKER_AVAILABLE = True
 except Exception:
     sagemaker = None
