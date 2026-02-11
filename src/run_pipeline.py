@@ -10,8 +10,18 @@ import sys
 # Add src to path (must be done before pipeline imports)
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+# Set default AWS region if not set (for testing)
+os.environ.setdefault("AWS_DEFAULT_REGION", "us-east-1")
+
 import boto3  # noqa: E402
-import sagemaker  # noqa: E402
+
+try:
+    import sagemaker  # noqa: E402
+    SAGEMAKER_AVAILABLE = True
+except Exception:
+    sagemaker = None
+    SAGEMAKER_AVAILABLE = False
+
 from pipeline.data_preparation import (  # noqa: E402
     generate_sample_data,
     preprocess_for_sagemaker,
@@ -31,6 +41,9 @@ def get_execution_role_safe():
     """
     Safely get execution role, returning None if not available.
     """
+    if not SAGEMAKER_AVAILABLE or sagemaker is None:
+        return None
+
     try:
         # Try the newer method first
         session = sagemaker.Session()
